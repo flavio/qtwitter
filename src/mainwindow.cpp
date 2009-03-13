@@ -33,7 +33,7 @@
 #include <QDesktopWidget>
 #include <QSignalMapper>
 
-const QString MainWindow::APP_VERSION = "0.5.0";
+const QString MainWindow::APP_VERSION = "0.5.1_yammer";
 
 MainWindow::MainWindow( QWidget *parent ) :
     QWidget( parent ),
