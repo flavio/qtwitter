@@ -170,6 +170,7 @@ void Settings::loadConfig( bool dialogRejected )
 
   if ( !dialogRejected ) {
     settings.beginGroup( "MainWindow" );
+    mainWindow->setVisibleList( settings.value( "visibleList", MainWindow::LIST_TWITTER ).toInt() );
     mainWindow->resize( settings.value( "size", QSize(307, 245) ).toSize() );
     QPoint offset( settings.value( "pos", QPoint(500,500) ).toPoint() );
     if ( QApplication::desktop()->width() < offset.x() + settings.value( "size" ).toSize().width() ) {
@@ -216,6 +217,7 @@ void Settings::saveConfig( int quitting )
   settings.beginGroup( "MainWindow" );
     settings.setValue( "size", mainWindow->size() );
     settings.setValue( "pos", mainWindow->pos() );
+    settings.setValue( "visibleList", mainWindow->getVisibleList() );
   settings.endGroup();
     settings.setValue( "SettingsWindow/pos", pos() );
   settings.beginGroup( "General" );

@@ -42,6 +42,15 @@ class MainWindow : public QWidget
   static const QString APP_VERSION;
 
 public:
+
+  /*!
+    An enum used to indicate which status list is currently visible.
+  */
+  enum VisibleList {
+    LIST_TWITTER, /*!< The Twitter list is visible.*/
+    LIST_YAMMER /*!< The Yammer list is visible.*/
+  };
+
   /*!
     A default constructor. Creates a MainWindow instance with the given \a parent.
   */
@@ -64,6 +73,22 @@ public:
     \returns List view scrollbar's width.
   */
   int getScrollBarWidth();
+
+  /*!
+    Sets the \a visiblelist to be shown.
+
+    \param The list which is requested to be shown.
+    \sa VisibleList
+  */
+  void setVisibleList( int visibleList);
+
+  /*!
+    A method indicating which statuses list is currently visible.
+
+    \returns The list which is currently visible.
+    \sa VisibleList
+  */
+  int getVisibleList();
 
   /*!
     Assigns the \a model to be a list view model.

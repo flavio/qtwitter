@@ -134,6 +134,27 @@ int MainWindow::getScrollBarWidth()
   return ui.statusListView->verticalScrollBar()->size().width();
 }
 
+void MainWindow::setVisibleList( int visibleList )
+{
+  if ( visibleList == MainWindow::LIST_TWITTER ) {
+    ui.twitterButton->setChecked( true );
+    ui.statusListView->setShown( true );
+    ui.yammerListView->setShown( false );
+  } else if ( visibleList == MainWindow::LIST_YAMMER ) {
+    ui.yammerButton->setChecked( true );
+    ui.yammerListView->setShown( true );
+    ui.statusListView->setShown( false );
+  }
+}
+
+int MainWindow::getVisibleList()
+{
+  if ( ui.statusListView->isVisible() )
+    return MainWindow::LIST_TWITTER;
+  else if ( ui.yammerListView->isVisible() )
+    return MainWindow::LIST_YAMMER;
+}
+
 void MainWindow::setListViewModel( TweetModel *model )
 {
   ui.statusListView->setModel( model );
