@@ -17,10 +17,8 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-
 #include "xmldownload.h"
 #include "xmlparserdirectmsg.h"
-#include "core.h"
 
 XmlData::XmlData() :
     id(-1),
@@ -55,17 +53,18 @@ void XmlData::clear()
   }
 }
 
-XmlDownload::XmlDownload( Role role, Core *coreParent, QObject *parent ) :
+XmlDownload::XmlDownload( TwitterAPI::Role role, const QString &username, const QString &password, QObject *parent ) :
     HttpConnection( parent ),
     role( role ),
     statusParser(0),
     directMsgParser(0),
-    core( coreParent ),
     authenticated( false )
 {
+  authData.setUser( username );
+  authData.setPassword( password );
   statusParser = new XmlParser( this );
   directMsgParser = new XmlParserDirectMsg( this );
-  createConnections( core );
+  createConnections();
 }
 
 XmlDownload::~XmlDownload()
@@ -76,7 +75,18 @@ XmlDownload::~XmlDownload()
     directMsgParser->deleteLater();
 }
 
-void XmlDownload::getContent( const QString &path, XmlDownload::ContentRequested content )
+void XmlDownload::createConnections()
+{
+  if ( role == TwitterAPI::Destroy ) {
+    connect( statusParser, SIGNAL(newEntry(Entry*)), this, SLOT(extractId(Entry*)) );
+  } else {
+    connect( statusParser, SIGNAL(newEntry(Entry*)), this, SIGNAL(newEntry(Entry*)) );
+  }
+  connect( directMsgParser, SIGNAL(newEntry(Entry*)), this, SIGNAL(newEntry(Entry*)) );
+  connect( this, SIGNAL(authenticationRequired(QString,quint16,QAuthenticator*)), this, SLOT(slotAuthenticationRequired(QString,quint16,QAuthenticator*)));
+}
+
+void XmlDownload::getContent( const QString &path, TwitterAPI::ContentRequested content )
 {
   QByteArray encodedPath = prepareRequest( path );
   if ( encodedPath == "invalid" ) {
@@ -90,7 +100,7 @@ void XmlDownload::getContent( const QString &path, XmlDownload::ContentRequested
   qDebug() << "Request of type GET and id" << httpGetId << "started" << state();
 }
 
-void XmlDownload::postContent( const QString &path, const QByteArray &status, XmlDownload::ContentRequested content )
+void XmlDownload::postContent( const QString &path, const QByteArray &status, TwitterAPI::ContentRequested content )
 {
   QByteArray encodedPath = prepareRequest( path );
   if ( encodedPath == "invalid" ) {
@@ -104,9 +114,39 @@ void XmlDownload::postContent( const QString &path, const QByteArray &status, Xm
   qDebug() << "Request of type POST and id" << httpGetId << "started";
 }
 
-XmlDownload::Role XmlDownload::getRole() const
+TwitterAPI::Role XmlDownload::getRole() const
 {
   return role;
+}
+
+QByteArray XmlDownload::getPostStatus()
+{
+  return postStatus;
+}
+
+int XmlDownload::getPostInReplyToId()
+{
+  return postInReplyToId;
+}
+
+int XmlDownload::getDestroyId()
+{
+  return destroyId;
+}
+
+void XmlDownload::setPostStatus( const QByteArray &newPostStatus )
+{
+  postStatus = newPostStatus;
+}
+
+void XmlDownload::setPostInReplyToId( int newId )
+{
+  postInReplyToId = newId;
+}
+
+void XmlDownload::setDestroyId( int newId )
+{
+  destroyId = newId;
 }
 
 void XmlDownload::extractId( Entry *entry )
@@ -118,21 +158,23 @@ void XmlDownload::slotAuthenticationRequired(const QString & /* hostName */, qui
 {
   qDebug() << "auth required";
   if ( authenticated ) {
-    qDebug() << "auth dialog";
-    switch ( core->authDataDialog() ) {
-      case Core::Rejected:
-        emit errorMessage( tr("Authentication is required to post updates.") );
-      case Core::SwitchToPublic:
-        httpRequestAborted = true;
-        authenticated = false;
-        abort();
-        core->get();
-        return;
-      default:
-        break;
+    httpRequestAborted = true;
+    authenticated = false;
+    abort();
+    switch (role) {
+    case TwitterAPI::Submit:
+      emit unauthorized( postStatus, postInReplyToId );
+      return;
+    case TwitterAPI::Destroy:
+      emit unauthorized( destroyId );
+      return;
+    default:
+    case TwitterAPI::Refresh:
+      emit unauthorized();
+      return;
     }
   }
-  *authenticator = core->getAuthData();
+  *authenticator = authData;
   authenticated = true;
 }
 
@@ -149,7 +191,7 @@ void XmlDownload::readResponseHeader(const QHttpResponseHeader &responseHeader)
     // these are not error conditions
     break;
   case 404:                   // Not Found
-    if ( role == Destroy ) {
+    if ( role == TwitterAPI::Destroy ) {
       QRegExp rx( "/statuses/destroy/(\\d+)\\.xml", Qt::CaseInsensitive );
       rx.indexIn( url.path() );
       emit deleteEntry( rx.cap(1).toInt() );
@@ -197,37 +239,19 @@ void XmlDownload::httpRequestFinished(int requestId, bool error)
   processedRequest( requestId )->clear();
   authenticated = false;
   if ( requestId == statusesData.id ) {
-    emit finished( Statuses );
+    emit finished( TwitterAPI::Statuses );
   } else if ( requestId == directMessagesData.id ) {
-    emit finished( DirectMessages );
+    emit finished( TwitterAPI::DirectMessages );
   }
 }
 
-void XmlDownload::createConnections( Core *coreParent )
-{
-  connect( this, SIGNAL(finished(XmlDownload::ContentRequested)), coreParent, SLOT(setFlag(XmlDownload::ContentRequested)) );
-  connect( this, SIGNAL(errorMessage(QString)), coreParent, SIGNAL(errorMessage(QString)) );
-  if ( role == Destroy ) {
-    connect( statusParser, SIGNAL(newEntry(Entry*)), this, SLOT(extractId(Entry*)) );
-    connect( this, SIGNAL(deleteEntry(int)), coreParent, SIGNAL(deleteEntry(int)) );
-  } else {
-    connect( statusParser, SIGNAL(newEntry(Entry*)), coreParent, SLOT(newEntry(Entry*)) );
-    connect( statusParser, SIGNAL(newEntry(Entry*)), coreParent, SLOT(downloadImage(Entry*)) );
-  }
-  if ( directMsgParser ) {
-    connect( directMsgParser, SIGNAL(newEntry(Entry*)), coreParent, SLOT(newEntry(Entry*)) );
-  }
-  connect( this, SIGNAL(authenticationRequired(QString,quint16,QAuthenticator*)), this, SLOT(slotAuthenticationRequired(QString,quint16,QAuthenticator*)));
-  connect( this, SIGNAL(cookieReceived(QStringList)), coreParent, SLOT(setCookie(QStringList)) );
-}
-
-XmlData* XmlDownload::processedRequest( XmlDownload::ContentRequested content )
+XmlData* XmlDownload::processedRequest( TwitterAPI::ContentRequested content )
 {
   switch ( content ) {
-    case DirectMessages:
+    case TwitterAPI::DirectMessages:
       return &directMessagesData;
       break;
-    case Statuses:
+    case TwitterAPI::Statuses:
     default:
       return &statusesData;
   }

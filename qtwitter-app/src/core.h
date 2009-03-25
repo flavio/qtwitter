@@ -25,13 +25,11 @@
 #include <QAuthenticator>
 #include <QTimer>
 
-#include "entry.h"
-#include "xmldownload.h"
-#include "xmlparser.h"
 #include "imagedownload.h"
 #include "mainwindow.h"
 
 class TwitPicEngine;
+class TwitterAPI;
 
 typedef QMap<QString, QImage> MapStringImage;
 
@@ -77,16 +75,7 @@ public:
   */
   void applySettings( int msecs, const QString &user, const QString &password, bool publicTimeline, bool directMessages );
 
-  bool isPublicTimelineSync(); /*!< Returns true if sync with public timeline is requested. \sa setPublicTimelineSync() */
-  bool isDirectMessagesSync(); /*!< Returns true if direct messages downloading is requested. \sa setDirectMessagesSync() */
   bool setTimerInterval( int msecs ); /*!< Sets timer interval to \a msecs miliseconds. */
-
-  /*!
-    Sets user login and password for authentication at twitter.com.
-    \param user User's login.
-    \param password User's password.
-  */
-  bool setAuthData( const QString &user, const QString &password );
 
   /*!
     Sets whether the public timeline is requested.
@@ -195,27 +184,6 @@ public slots:
   */
   AuthDialogState authDataDialog( const QString &user = QString(), const QString &password = QString() );
 
-  /*!
-    Outputs user's login and password.
-    \returns QAuthenticator object containing user's authentication data.
-  */
-  const QAuthenticator& getAuthData() const;
-
-  /*!
-    Sets cookie received from Twitter. Not used currently as it sometimes doesn't work properly.
-  */
-  void setCookie( const QStringList );
-
-  /*!
-    Used to figure out when XmlDownload instance finishes its job. XmlDownload class emits
-    signals connected to this slot when it finishes its requests. When all the requests are
-    finished (i.e. one request when public timeline is requested or direct messages downloading
-    is disabled or two requests when friends timeline with direct messages is requested), this
-    slot resets connections and notifies User of new Tweets.
-    \sa timelineUpdated()
-  */
-  void setFlag( XmlDownload::ContentRequested flag );
-
 signals:
   /*!
     Sends a \a message to MainWindow class instance, to notify user about encountered
@@ -230,12 +198,6 @@ signals:
     \sa setAuthData(), authDataDialog()
   */
   void authDataSet( const QAuthenticator &authenticator );
-
-  /*!
-    Emitted when user switches to public timeline sync in authentication dialog.
-    \sa isPublicTimelineSync(), setPublicTimelineSync()
-  */
-  void switchToPublic();
 
   /*!
     Emitted when a single Tweet \a entry is parsed and ready to be inserted into model.
@@ -302,28 +264,26 @@ signals:
     \sa setDirectMessagesSync(), isDirectMessagesSync()
   */
   void noDirectMessages();
+  void directMessagesSyncChanged( bool isEnabled );
+  void publicTimelineSyncChanged( bool isEnabled );
 
 private slots:
   void setImageInHash( const QString&, QImage );
-  void newEntry( Entry* );
+  void slotUnauthorized();
+  void slotUnauthorized( const QByteArray &status, int inReplyToId );
+  void slotUnauthorized( int destroyId );
 
 private:
-  void destroyXmlConnection();
-  bool publicTimelineSync;
-  bool directMessagesSync;
+  bool retryAuthorizing( int role );
   bool switchUser;
   bool authDialogOpen;
-  XmlDownload *xmlGet;
-  XmlDownload *xmlPost;
+  TwitterAPI *twitterapi;
   TwitPicEngine *twitpicUpload;
   QMap<QString,ImageDownload*> imageDownloader;
   MapStringImage imageCache;
   QAuthenticator authData;
-  QStringList cookie;
   QString currentUser;
   QTimer *timer;
-  bool statusesDone;
-  bool messagesDone;
 #ifdef Q_WS_X11
   QString browserPath;
 #endif
