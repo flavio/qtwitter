@@ -74,7 +74,6 @@ SOURCES += src/main.cpp \
     src/twitteraccountsdelegate.cpp \
     src/qtwitter.cpp \
     src/twitteraccountsmodel.cpp \
-    src/urlshortener.cpp \
     src/aboutdialog.cpp
 HEADERS += src/mainwindow.h \
     src/statusedit.h \
@@ -92,7 +91,6 @@ HEADERS += src/mainwindow.h \
     src/twitteraccountsdelegate.h \
     src/qtwitter.h \
     src/twitteraccountsmodel.h \
-    src/urlshortener.h \
     src/aboutdialog.h
 FORMS += ui/mainwindow.ui \
     ui/authdialog.ui \
@@ -117,3 +115,5 @@ OBJECTS_DIR = tmp
 INCLUDEPATH += $${TOP} \
     src \
     tmp
+
+include(src/urlshortener/urlshortener.pri)
